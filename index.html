@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Market Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .typing-dot {
+            animation: typing 1.5s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0%, 100% { opacity: 0.3; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-3px); }
+        }
+        .stock-up {
+            color: #10B981;
+        }
+        .stock-down {
+            color: #EF4444;
+        }
+        .stock-card {
+            background-color: #f8fafc;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            border-left: 4px solid #3b82f6;
+            margin-bottom: 0.5rem;
+        }
+        .stock-card .currency {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        .api-notice {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border-radius: 0 0.375rem 0.375rem 0;
+        }
+        .stock-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }
+        .mini-graph {
+            width: 60px;
+            height: 30px;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body class="bg-gray-700 min-h-screen flex items-center justify-center p-4 md:p-10">
+    <div class="w-full max-w-6xl rounded-lg min-h-screen max-h-400 ">
+        <div class="bg-indigo-900 rounded-lg shadow-xl overflow-hidden">
+            <!-- Chat Header -->
+            <div class="bg-indigo-900 text-white p-4 ">
+                <div class="flex items-center">
+                    <div class="bg-indigo-500 p-2 rounded-full">
+                        <i class="fas fa-chart-line text-white"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h2 class="font-semibold text-lg">Stock Market Assistant</h2>
+                        <p class="text-indigo-100 text-xs">Real-time market data & insights</p>
+                    </div>
+                    <div class="ml-auto flex items-center space-x-2">
+                        <span class="h-2 w-2 rounded-full bg-green-400 animate-pulse"></span>
+                        <span class="text-xs">Online</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Chat Messages -->
+            <div class="h-96 overflow-y-auto p-4 bg-gray-500" id="chat-messages">
+                <!-- Initial message -->
+                <div class="mb-4">
+                    <div class="flex items-start">
+                        <div class="bg-indigo-100 p-2 rounded-full mr-2">
+                            <i class="fas fa-robot text-indigo-600"></i>
+                        </div>
+                        <div class="bg-gray-200 text-gray-800 rounded-lg py-2 px-3 max-w-xs md:max-w-md">
+                            <p>Hello! I'm your professional stock market assistant. I can help you with:</p>
+                            <ul class="list-disc pl-5 mt-1 space-y-1">
+                                <li>Real-time stock prices</li>
+                                <li>Market trends and analysis</li>
+                                <li>Company financials</li>
+                                <li>Investment research</li>
+                            </ul>
+                            <p class="mt-2">Try asking about a stock symbol like "AAPL" or multiple stocks like "AAPL, MSFT".</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Chat Input -->
+            <div class="border-t border-gray-200 p-4 bg-blue-100 shadow shadow-blue-800 rounded-2xl">
+                <div class="flex mb-2 space-x-2 overflow-x-auto pb-2 ">
+                    <button class="quick-query shadow shadow-blue-800 bg-green-300 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-full text-sm whitespace-nowrap transition" data-query="AAPL">
+                        AAPL
+                    </button>
+                    <button class="quick-query shadow shadow-blue-800 bg-green-300 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-full text-sm whitespace-nowrap transition" data-query="MSFT">
+                        MSFT
+                    </button>
+                    <button class="quick-query shadow shadow-blue-800 bg-green-300 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-full text-sm whitespace-nowrap transition" data-query="TSLA">
+                        TSLA
+                    </button>
+                    <button class="quick-query shadow shadow-blue-800 bg-green-300 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-full text-sm whitespace-nowrap transition" data-query="GOOGL">
+                        GOOGL
+                    </button>
+                    <button class="quick-query shadow shadow-blue-800 bg-green-300 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-full text-sm whitespace-nowrap transition" data-query="AAPL, MSFT, TSLA">
+                        Compare
+                    </button>
+                </div>
+                <div class="flex">
+                    <input type="text" id="stock-query" placeholder="Enter stock symbol or ask a question..." 
+                           class="flex-1 border border-gray-300 rounded-full p-2 shadow shadow-blue-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <button id="send-query" 
+                            class="bg-indigo-600 text-white px-4 rounded-full shadow shadow-blue-800 hover:bg-indigo-700 transition flex items-center justify-center w-12 ml-2">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const chatMessages = document.getElementById("chat-messages");
+            const inputField = document.getElementById("stock-query");
+            const sendButton = document.getElementById("send-query");
+            const quickQueryButtons = document.querySelectorAll(".quick-query");
+
+            // Generate a simple SVG line graph
+            function generateMiniGraph(points, isPositive) {
+                const width = 60;
+                const height = 30;
+                const padding = 2;
+                
+                // Normalize points to fit within the SVG
+                const min = Math.min(...points);
+                const max = Math.max(...points);
+                const range = max - min || 1; // Avoid division by zero
+                
+                const normalizedPoints = points.map(p => 
+                    height - padding - ((p - min) / range) * (height - padding * 2)
+                );
+                
+                // Generate path data
+                let pathData = `M0 ${normalizedPoints[0]}`;
+                for (let i = 1; i < normalizedPoints.length; i++) {
+                    pathData += ` L${(width / (points.length - 1)) * i} ${normalizedPoints[i]}`;
+                }
+                
+                return `
+                    <svg class="mini-graph" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+                        <path d="${pathData}" 
+                              stroke="${isPositive ? '#10B981' : '#EF4444'}" 
+                              stroke-width="2" 
+                              fill="none" 
+                              stroke-linecap="round" 
+                              stroke-linejoin="round"/>
+                    </svg>
+                `;
+            }
+
+            // Generate random points for a trend (for demo purposes)
+            function generateTrendPoints(isPositive) {
+                const points = [];
+                const start = Math.random() * 30 + 10;
+                
+                for (let i = 0; i < 6; i++) {
+                    if (isPositive) {
+                        points.push(start + i * (Math.random() * 5 + 2));
+                    } else {
+                        points.push(start - i * (Math.random() * 5 + 2));
+                    }
+                }
+                
+                return points;
+            }
+
+            // Format stock data into a nice card
+            function formatStockData(stock) {
+                const change = parseFloat(stock.change);
+                const isPositive = change >= 0;
+                const changeClass = isPositive ? 'text-green-500' : 'text-red-500';
+                const trendPoints = generateTrendPoints(isPositive);
+                const miniGraph = generateMiniGraph(trendPoints, isPositive);
+                
+                return `
+                    <div class="bg-white rounded-lg shadow p-4 mb-3 border-l-4 ${isPositive ? 'border-green-500' : 'border-red-500'}">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold text-lg">${stock.symbol}</h3>
+                                <p class="text-sm text-gray-500">${stock.exch || 'NYSE'} • ${stock.ccy || 'USD'}</p>
+                            </div>
+                            <span class="text-xs bg-gray-100 px-2 py-1 rounded">Stock</span>
+                        </div>
+                        
+                        <div class="mt-2 flex items-baseline">
+                            <span class="text-2xl font-bold mr-2">${stock.ccy || '$'}${stock.price}</span>
+                            <span class="${changeClass} font-medium">
+                                ${stock.change} (${stock.change_percent})
+                                ${miniGraph}
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+                            <div>
+                                <span class="text-gray-500">High:</span>
+                                <span class="font-medium ml-1">${stock.ccy || '$'}${stock.high}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Low:</span>
+                                <span class="font-medium ml-1">${stock.ccy || '$'}${stock.low}</span>
+                            </div>
+                            ${stock.open ? `
+                            <div>
+                                <span class="text-gray-500">Open:</span>
+                                <span class="font-medium ml-1">${stock.ccy || '$'}${stock.open}</span>
+                            </div>
+                            ` : ''}
+                            ${stock.volume ? `
+                            <div>
+                                <span class="text-gray-500">Volume:</span>
+                                <span class="font-medium ml-1">${stock.volume}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="mt-2 text-xs text-gray-400">
+                            Updated: ${new Date(stock.tm || Date.now()).toLocaleString()}
+                        </div>
+                    </div>
+                `;
+            }
+
+            function formatFinancialResponse(text) {
+                // Enhanced formatting for financial data
+                let formatted = text
+                    .replace(/(\$\d+\.\d+)/g, '<span class="font-bold text-blue-600">$1</span>')
+                    .replace(/([+-]?\d+\.\d+%)/g, function(match) {
+                        const colorClass = match.startsWith('+') ? 'text-green-500' : 'text-red-500';
+                        return `<span class="${colorClass} font-medium">${match}</span>`;
+                    })
+                    .replace(/^(.*?:)/gm, '<span class="font-semibold text-gray-700">$1</span>')
+                    .replace(/^\s*-\s*(.*$)/gm, '<li class="ml-4">$1</li>')
+                    .replace(/\n/g, '<br>');
+
+                formatted = formatted.replace(/(<li.*?>.*?<\/li>)+/g, '<ul class="list-disc pl-5 space-y-1">$&</ul>');
+                return `<div class="prose max-w-none">${formatted}</div>`;
+            }
+
+            function showApiLimitNotice() {
+                const notice = `
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0 text-yellow-400">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-yellow-700">
+                                    Using demo API with limited access. 
+                                    <a href="https://www.alphavantage.co/premium/" 
+                                       target="_blank" 
+                                       class="font-medium underline text-yellow-700 hover:text-yellow-600">
+                                        Upgrade for full access
+                                    </a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                if (!sessionStorage.getItem('apiNoticeShown')) {
+                    appendMessage("bot", notice, true);
+                    sessionStorage.setItem('apiNoticeShown', 'true');
+                }
+            }
+
+            function formatMultipleStocks(stocks) {
+                return `
+                    <div class="mb-2">
+                        <p class="text-sm font-medium mb-1">Showing ${stocks.length} stocks:</p>
+                        <div class="stock-grid">
+                            ${stocks.map(stock => formatStockData(stock)).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            function appendMessage(sender, text, isHTML = false) {
+                const messageDiv = document.createElement("div");
+                messageDiv.classList.add("mb-4", "flex", sender === "user" ? "justify-end" : "justify-start");
+
+                const messageContent = isHTML ? text : 
+                    sender === "bot" 
+                    ? `<div class="bg-gray-200 text-gray-800 rounded-lg py-2 px-3 max-w-xs md:max-w-md">${formatResponse(text)}</div>`
+                    : `<div class="bg-blue-900 text-white rounded-lg py-2 px-3 max-w-xs md:max-w-md">${text}</div>`;
+
+                messageDiv.innerHTML = `
+                    <div class="flex items-start max-w-full">
+                        ${sender === "bot" ? '<div class="bg-indigo-100 p-2 rounded-full mr-2"><i class="fas fa-robot text-indigo-600"></i></div>' : ""}
+                        ${messageContent}
+                        ${sender === "user" ? '<div class="bg-blue-500 p-2 rounded-full ml-2"><i class="fas fa-user text-white"></i></div>' : ""}
+                    </div>
+                `;
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            function formatResponse(text) {
+                return text
+                    .replace(/(\$\d+\.\d+)/g, '<span class="font-bold">$1</span>')
+                    .replace(/(\+[\d\.]+%)/g, '<span class="stock-up">$1</span>')
+                    .replace(/(-[\d\.]+%)/g, '<span class="stock-down">$1</span>')
+                    .replace(/\n/g, '<br>');
+            }
+
+            function showTypingIndicator() {
+                const typingIndicator = document.createElement("div");
+                typingIndicator.classList.add("mb-4", "flex", "justify-start");
+                typingIndicator.innerHTML = `
+                    <div class="flex items-start">
+                        <div class="bg-indigo-100 p-2 rounded-full mr-2"><i class="fas fa-robot text-indigo-600"></i></div>
+                        <div class="bg-gray-200 text-gray-800 rounded-lg py-2 px-3 max-w-xs flex space-x-1">
+                            <span class="typing-dot bg-gray-500 w-2 h-2 rounded-full"></span>
+                            <span class="typing-dot bg-gray-500 w-2 h-2 rounded-full"></span>
+                            <span class="typing-dot bg-gray-500 w-2 h-2 rounded-full"></span>
+                        </div>
+                    </div>
+                `;
+                chatMessages.appendChild(typingIndicator);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                return typingIndicator;
+            }
+
+            async function fetchStockData(symbol) {
+                // Temporary mock data - remove when backend works
+                const mockData = {
+                    status: "success",
+                    data: {
+                        symbol: symbol,
+                        price: (Math.random() * 500).toFixed(2),
+                        change: (Math.random() * 10 - 5).toFixed(2),
+                        change_percent: (Math.random() * 5 - 2.5).toFixed(2) + "%",
+                        high: (Math.random() * 550).toFixed(2),
+                        low: (Math.random() * 450).toFixed(2),
+                        open: (Math.random() * 500).toFixed(2),
+                        volume: Math.floor(Math.random() * 10000000).toLocaleString(),
+                        exch: "NASDAQ",
+                        ccy: "USD"
+                    }
+                };
+                return formatStockData(mockData.data);
+                
+                // Keep your original try/catch below for when backend works
+                // try { ... } catch ...
+            }
+
+            async function fetchMultipleStocks(symbols) {
+                try {
+                    const response = await fetch("http://localhost:5000/multi-stocks", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ symbols: symbols })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === "success" && data.data.length > 0) {
+                        showApiLimitNotice();
+                        return formatMultipleStocks(data.data);
+                    }
+                    return "Could not fetch stock data for these symbols.";
+                } catch (error) {
+                    console.error("Error:", error);
+                    return "Error fetching stock data. Please try again later.";
+                }
+            }
+
+            async function sendMessage(query) {
+                if (!query.trim()) return;
+
+                appendMessage("user", query);
+                inputField.value = "";
+
+                const typingIndicator = showTypingIndicator();
+
+                try {
+                    // Check if it's a single stock symbol
+                    if (/^[A-Za-z]{1,5}$/.test(query.trim())) {
+                        const stockInfo = await fetchStockData(query.trim().toUpperCase());
+                        chatMessages.removeChild(typingIndicator);
+                        appendMessage("bot", stockInfo, true);
+                    } 
+                    // Check if it's multiple stocks separated by commas
+                    else if (/^[A-Za-z]{1,5}(,\s*[A-Za-z]{1,5}){0,4}$/.test(query.trim())) {
+                        const symbols = query.trim().toUpperCase().split(/,\s*/);
+                        const stocksInfo = await fetchMultipleStocks(symbols);
+                        chatMessages.removeChild(typingIndicator);
+                        appendMessage("bot", stocksInfo, true);
+                    }
+                    // Fall back to Gemini for general questions
+                    else {
+                        const response = await fetch("http://localhost:5000/analyze", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ 
+                                query: query,
+                                context: "US Markets"
+                            })
+                        });
+                        const data = await response.json();
+                        chatMessages.removeChild(typingIndicator);
+                        
+                        if (data.status === "success") {
+                            const formattedResponse = formatFinancialResponse(data.response);
+                            appendMessage("bot", formattedResponse, true);
+                        } else {
+                            appendMessage("bot", data.response);
+                        }
+                    }
+                } catch (error) {
+                    chatMessages.removeChild(typingIndicator);
+                    appendMessage("bot", "Sorry, I'm having trouble connecting to the market data service. Please try again later.");
+                    console.error("Error:", error);
+                }
+            }
+
+            // Event listeners
+            sendButton.addEventListener("click", () => sendMessage(inputField.value));
+            inputField.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") sendMessage(inputField.value);
+            });
+            quickQueryButtons.forEach(button => {
+                button.addEventListener("click", () => {
+                    inputField.value = button.dataset.query;
+                    sendMessage(button.dataset.query);
+                });
+            });
+
+            // Focus input field on load
+            inputField.focus();
+
+            // Show API limitation notice when page loads
+            setTimeout(() => {
+                showApiLimitNotice();
+            }, 1500);
+        });
+    </script>
+</body>
+</html>
